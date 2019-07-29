@@ -23,7 +23,10 @@
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8888
 
+#define BLCOK_SIZE 1024
+
 char *password = "meiyoumima";
+
 
 typedef struct {
     int fd;
@@ -349,8 +352,8 @@ int check_replay(time_t timestemp, const unsigned char *noise) {
 void sc_init(sc_ctx *ctx, int fd) {
     memset(ctx, 0, sizeof(sc_ctx));
     ctx->fd = fd;
-    ctx->buffer_size = 1024;
-    ctx->buffer = malloc(1024);
+    ctx->buffer_size = BLCOK_SIZE;
+    ctx->buffer = malloc(BLCOK_SIZE);
 }
 
 void write_and_clean(sc_ctx *ctx, int peer_fd) {
@@ -417,8 +420,8 @@ void read_sc_pack(sc_ctx *ctx) {
     enc_data = malloc(data_size);
     read_size(fd, enc_data, data_size);
     if (data_size + ctx->data_size > ctx->buffer_size) {
-        ctx->buffer = realloc(ctx->buffer, data_size + ctx->data_size + 1024);
-        ctx->buffer_size = data_size + ctx->data_size + 1024;
+        ctx->buffer = realloc(ctx->buffer, data_size + ctx->data_size + BLCOK_SIZE);
+        ctx->buffer_size = data_size + ctx->data_size + BLCOK_SIZE;
     }
 
     aes_dec(enc_data, data_size, ctx->buffer + ctx->data_size, key, iv);
@@ -460,9 +463,9 @@ void read_size_sc(sc_ctx *ctx, unsigned char *buffer, unsigned int size) {
             memcpy(buffer, ctx->buffer, size);
             ctx->data_size -= size;
             memmove(ctx->buffer, ctx->buffer + size, ctx->data_size);
-            if (ctx->data_size < ctx->buffer_size - 1024) {
-                ctx->buffer = realloc(ctx->buffer, ctx->data_size + 1024);
-                ctx->buffer_size = ctx->data_size + 1024;
+            if (ctx->data_size < ctx->buffer_size - BLCOK_SIZE) {
+                ctx->buffer = realloc(ctx->buffer, ctx->data_size + BLCOK_SIZE);
+                ctx->buffer_size = ctx->data_size + BLCOK_SIZE;
             }
             return;
         } else {

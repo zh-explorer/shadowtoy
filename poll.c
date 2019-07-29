@@ -20,7 +20,7 @@
 #include "log.h"
 #include <openssl/sha.h>
 
-#define BLCOK_SIZE 0x8000
+#define BLCOK_SIZE 1024
 
 typedef struct {
     int fd;

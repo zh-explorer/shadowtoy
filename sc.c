@@ -417,7 +417,7 @@ void read_sc_pack(sc_ctx *ctx) {
         exit(1);
     }
     data_size = dec_pack.length - dec_pack.random_len - 80;
-    enc_data = malloc(data_size);
+    enc_data = malloc(data_size); // bug
     read_size(fd, enc_data, data_size);
     if (data_size + ctx->data_size > ctx->buffer_size) {
         ctx->buffer = realloc(ctx->buffer, data_size + ctx->data_size + BLCOK_SIZE);
@@ -442,7 +442,7 @@ void read_sc_pack(sc_ctx *ctx) {
 //    memset(ctx->buffer + ctx->data_size + data_size - pad, 0, pad);
     ctx->data_size += data_size - pad;
     free(enc_data);
-    rand_data = malloc(dec_pack.random_len);
+    rand_data = alloca(dec_pack.random_len); // # 1. create bug  
     read_size(fd, rand_data, dec_pack.random_len);
     SHA256_Update(&sha256_ctx, rand_data, dec_pack.random_len);
 

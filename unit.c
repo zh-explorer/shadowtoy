@@ -19,6 +19,10 @@ void read_size(int fd, unsigned char *buffer, unsigned int size) {
     int result;
     while (read_count != size) {
         result = (int) read(fd, buffer + read_count, size - read_count);
+        if (result == 0) {
+            logger(ERR, stderr, "peer if close");
+            exit(1);
+        }
         if (result == -1) {
             logger(ERR, stderr, "recv data error");
             exit(1);

@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <wait.h>
 #include "poll.h"
 
 
@@ -56,7 +57,17 @@ int main(int argc, char *argv[]) {
         if (pid != 0) {
             // parent
             close(accpet_fd);
+            wait(NULL);
         } else {
+            pid = fork();
+            if (pid == -1) {
+                logger(ERR, stderr, "fork error", strerror(errno));
+                // fork error
+                exit(1);
+            } else if (pid != 0) {
+                // parent
+                exit(0);
+            }
             break;
         }
     }

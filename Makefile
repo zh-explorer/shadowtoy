@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-g
-LD=-Wl,-Bstatic -lcrypto  -Wl,-Bdynamic -no-pie
+CFLAGS=-g -fno-stack-protector
+LD=-Wl,-Bstatic -lcrypto  -Wl,-Bdynamic
 OBJ=log.o netio.o poll.o socks5.o unit.o sc.o
 
 .PHONY: clean

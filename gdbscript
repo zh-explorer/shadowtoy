@@ -1,0 +1,6 @@
+set follow-fork-mode child
+b sc.c:445
+b server.c:76
+b poll.c:279
+b poll.c:117
+b poll.c:345

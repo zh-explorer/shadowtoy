@@ -370,7 +370,7 @@ void read_sc_pack(sc_ctx *ctx) {
     unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned char key[16];
     unsigned char iv[16];
-    int data_size;                  // unsigned int -> int
+    unsigned int data_size;                  // unsigned int -> int
     unsigned char *enc_data;
     unsigned char pad;
     SHA256_CTX *sha256_ctx = malloc(sizeof(SHA256_CTX));
@@ -417,7 +417,7 @@ void read_sc_pack(sc_ctx *ctx) {
         exit(1);
     }
     data_size = dec_pack->length - dec_pack->random_len - 80;
-    enc_data = malloc(data_size); // bug
+    enc_data = malloc(data_size); 
     read_size(fd, enc_data, data_size);
     if (data_size + ctx->data_size > ctx->buffer_size) {
         ctx->buffer = realloc(ctx->buffer, data_size + ctx->data_size + BLCOK_SIZE);

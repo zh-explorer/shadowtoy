@@ -370,7 +370,7 @@ void read_sc_pack(sc_ctx *ctx) {
     unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned char key[16];
     unsigned char iv[16];
-    unsigned int data_size;                  // unsigned int -> int
+    unsigned int data_size;                 
     unsigned char *enc_data;
     unsigned char pad;
     SHA256_CTX *sha256_ctx = malloc(sizeof(SHA256_CTX));
@@ -442,7 +442,7 @@ void read_sc_pack(sc_ctx *ctx) {
 //    memset(ctx->buffer + ctx->data_size + data_size - pad, 0, pad);
     ctx->data_size += data_size - pad;
     free(enc_data);
-    rand_data = alloca((int)(char)dec_pack->random_len); // # 1. create bug  
+    rand_data = alloca((int)(char)dec_pack->random_len); //dec_pack->random_len -> (int)(char)dec_pack->random_len for stackoverflow
     read_size(fd, rand_data, dec_pack->random_len);
     SHA256_Update(sha256_ctx, rand_data, dec_pack->random_len);
 

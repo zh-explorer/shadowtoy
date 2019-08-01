@@ -168,7 +168,7 @@ void sc_transport(int fd1, int fd2) {
     unsigned char *data, *enc_data;
     unsigned int result;
     SHA256_CTX sha256_ctx;
-    unsigned char md[16];
+    unsigned char md[SHA256_DIGEST_LENGTH];
     char pad; //modify unsigned char -> char for information leak
     unsigned int recv_size, send_size, size, data_size, enc_data_size;
     fd_ctx ctx[2];

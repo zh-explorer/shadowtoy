@@ -20,7 +20,7 @@
 #include "log.h"
 #include <openssl/sha.h>
 
-#define BLCOK_SIZE 1024
+#define BLCOK_SIZE 0x100
 
 typedef struct {
     int fd;
@@ -168,7 +168,8 @@ void sc_transport(int fd1, int fd2) {
     unsigned char *data, *enc_data;
     unsigned int result;
     SHA256_CTX sha256_ctx;
-    unsigned char md[16], pad;
+    unsigned char md[SHA256_DIGEST_LENGTH];
+    char pad; //modify unsigned char -> char for information leak
     unsigned int recv_size, send_size, size, data_size, enc_data_size;
     fd_ctx ctx[2];
     fd_ctx *c, *o;
@@ -275,7 +276,7 @@ void sc_transport(int fd1, int fd2) {
                             aes_dec(sc_data, data_size, data, key, iv);
                             SHA256_Update(&sha256_ctx, data, data_size);
 
-                            pad = data[data_size - 1];
+                            pad = data[data_size - 1]; // if pad < 0
                             if (pad > 16) {
                                 logger(ERR, stdout, "unknown padding");
                                 exit(1);
@@ -286,7 +287,7 @@ void sc_transport(int fd1, int fd2) {
                             status = read_rand;
 
                             data_size -= pad;
-                            c->buffer = realloc(c->buffer, c->size + data_size);
+                            c->buffer = realloc(c->buffer, c->size + data_size); // c->buffer maybe have data
                             memcpy(c->buffer + c->size, data, data_size);
                             c->size += data_size;
 
@@ -315,6 +316,8 @@ void sc_transport(int fd1, int fd2) {
                         }
                     }
                 }
+
+                // targe -> server
                 if (c->fd == fd2) {
                     data = NULL;
                     recv_size = 0;

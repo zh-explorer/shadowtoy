@@ -362,62 +362,62 @@ void write_and_clean(sc_ctx *ctx, int peer_fd) {
 }
 
 void read_sc_pack(sc_ctx *ctx) {
-    sc_package pack;
-    sc_package dec_pack;
+    sc_package *pack = malloc(sizeof(sc_package));
+    sc_package *dec_pack = malloc(sizeof(sc_package));
     int fd = ctx->fd;
     unsigned char *rand_data;
 //    unsigned char token[16];
     unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned char key[16];
     unsigned char iv[16];
-    unsigned int data_size;
+    unsigned int data_size;                 
     unsigned char *enc_data;
     unsigned char pad;
-    SHA256_CTX sha256_ctx;
+    SHA256_CTX *sha256_ctx = malloc(sizeof(SHA256_CTX));
 //    time_t timestamp;
 //    unsigned char noise[16];
 
-    memset(&pack, 0, sizeof(sc_package));
-    memset(&dec_pack, 0, sizeof(sc_package));
+    memset(pack, 0, sizeof(sc_package));
+    memset(dec_pack, 0, sizeof(sc_package));
 
-    read_size(fd, dec_pack.token, 16);
+    read_size(fd, dec_pack->token, 16);
 
-    SHA256_Init(&sha256_ctx);
-    SHA256_Update(&sha256_ctx, password, strlen(password));
-    SHA256_Update(&sha256_ctx, dec_pack.token, 16);
-    SHA256_Final(md, &sha256_ctx);
+    SHA256_Init(sha256_ctx);
+    SHA256_Update(sha256_ctx, password, strlen(password));
+    SHA256_Update(sha256_ctx, dec_pack->token, 16);
+    SHA256_Final(md, sha256_ctx);
 
     memcpy(key, md, 16);
     memcpy(iv, md + 16, 16);
 
-    read_size(fd, (unsigned char *) &pack.timestamp, 8);
-    read_size(fd, pack.noise, 8);
+    read_size(fd, (unsigned char *) &pack->timestamp, 8);
+    read_size(fd, pack->noise, 8);
 
-    aes_dec((unsigned char *) &pack.timestamp, 16, (unsigned char *) &dec_pack.timestamp, key, iv);
+    aes_dec((unsigned char *) &pack->timestamp, 16, (unsigned char *) &dec_pack->timestamp, key, iv);
 
-    SHA256_Init(&sha256_ctx);
-    SHA256_Update(&sha256_ctx, password, strlen(password));
-    SHA256_Update(&sha256_ctx, &dec_pack.timestamp, 8);
-    SHA256_Update(&sha256_ctx, dec_pack.noise, 8);
-    SHA256_Final(md, &sha256_ctx);
+    SHA256_Init(sha256_ctx);
+    SHA256_Update(sha256_ctx, password, strlen(password));
+    SHA256_Update(sha256_ctx, &dec_pack->timestamp, 8);
+    SHA256_Update(sha256_ctx, dec_pack->noise, 8);
+    SHA256_Final(md, sha256_ctx);
 
-    if (memcmp(dec_pack.token, md, 16)) {
+    if (memcmp(dec_pack->token, md, 16)) {
         logger(ERR, stdout, "token error");
         exit(1);
     }
-    if (check_replay(dec_pack.timestamp, dec_pack.noise)) {
+    if (check_replay(dec_pack->timestamp, dec_pack->noise)) {
         //packed may be replay, abort it
         logger(ERR, stdout, "replay packed");
         exit(1);
     }
-    read_size(fd, &pack.main_version, 48);
-    aes_dec(&pack.main_version, 48, &dec_pack.main_version, key, iv);
-    if (dec_pack.main_version != 1) {
+    read_size(fd, &pack->main_version, 48);
+    aes_dec(&pack->main_version, 48, &dec_pack->main_version, key, iv);
+    if (dec_pack->main_version != 1) {
         logger(ERR, stdout, "unknown main version");
         exit(1);
     }
-    data_size = dec_pack.length - dec_pack.random_len - 80;
-    enc_data = malloc(data_size);
+    data_size = dec_pack->length - dec_pack->random_len - 80;
+    enc_data = malloc(data_size); 
     read_size(fd, enc_data, data_size);
     if (data_size + ctx->data_size > ctx->buffer_size) {
         ctx->buffer = realloc(ctx->buffer, data_size + ctx->data_size + BLCOK_SIZE);
@@ -426,12 +426,12 @@ void read_sc_pack(sc_ctx *ctx) {
 
     aes_dec(enc_data, data_size, ctx->buffer + ctx->data_size, key, iv);
 
-    SHA256_Init(&sha256_ctx);
-    memcpy(md, dec_pack.hash_sum, 32);
-    memset(dec_pack.hash_sum, 0, 32); // clean hash sum
-    SHA256_Update(&sha256_ctx, &dec_pack, 80);
-    memcpy(dec_pack.hash_sum, md, 32); // restore
-    SHA256_Update(&sha256_ctx, ctx->buffer + ctx->data_size, data_size);
+    SHA256_Init(sha256_ctx);
+    memcpy(md, dec_pack->hash_sum, 32);
+    memset(dec_pack->hash_sum, 0, 32); // clean hash sum
+    SHA256_Update(sha256_ctx, dec_pack, 80);
+    memcpy(dec_pack->hash_sum, md, 32); // restore
+    SHA256_Update(sha256_ctx, ctx->buffer + ctx->data_size, data_size);
 
 
     pad = *(ctx->buffer + ctx->data_size + data_size - 1);
@@ -442,16 +442,16 @@ void read_sc_pack(sc_ctx *ctx) {
 //    memset(ctx->buffer + ctx->data_size + data_size - pad, 0, pad);
     ctx->data_size += data_size - pad;
     free(enc_data);
-    rand_data = malloc(dec_pack.random_len);
-    read_size(fd, rand_data, dec_pack.random_len);
-    SHA256_Update(&sha256_ctx, rand_data, dec_pack.random_len);
+    rand_data = alloca((int)(char)dec_pack->random_len); //dec_pack->random_len -> (int)(char)dec_pack->random_len for stackoverflow
+    read_size(fd, rand_data, dec_pack->random_len);
+    SHA256_Update(sha256_ctx, rand_data, dec_pack->random_len);
 
-    free(rand_data);
+    // free(rand_data);
 
-    SHA256_Final(md, &sha256_ctx);
+    SHA256_Final(md, sha256_ctx);
 
 
-    if (memcmp(dec_pack.hash_sum, md, 32)) {
+    if (memcmp(dec_pack->hash_sum, md, 32)) {
         logger(ERR, stdout, "hash sum mismatch");
         exit(1);
     }

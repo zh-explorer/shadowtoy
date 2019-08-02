@@ -28,6 +28,9 @@ int main(int argc, char *argv[]) {
     pid_t pid;
     in_addr_t ip;
     int port;
+    struct sockaddr_in addr;
+    unsigned int addr_len;
+    int result;
 
     if (argc == 2) {
         port = atoi(argv[1]);
@@ -41,6 +44,13 @@ int main(int argc, char *argv[]) {
     ip = inet_addr(LISTEN_IP);
     server_fd = tcp_listen(ip, htons(port));
 
+    addr_len = sizeof(addr);
+    result = getsockname(server_fd, (struct sockaddr *) &addr, (socklen_t *) &addr_len);
+    if (result == -1) {
+        puts("can not find port, maybe server is error");
+    }
+    printf("now you server if at %d port\n", ntohs(addr.sin_port));
+
     while (1) {
         accpet_fd = accept(server_fd, NULL, NULL);
         if (accpet_fd < 0) {
@@ -48,7 +58,7 @@ int main(int argc, char *argv[]) {
             logger(ERR, stderr, "get a err fd", strerror(errno));
             continue;
         }
-        sleep(1) ;  //Prevent brute force
+        sleep(1);  //Prevent brute force
         pid = fork();
         if (pid == -1) {
             logger(ERR, stderr, "fork error", strerror(errno));

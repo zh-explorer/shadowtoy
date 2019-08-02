@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 
-#define LOG_DEBUG
+//#define LOG_DEBUG
 
 #ifdef LOG_DEBUG
 int

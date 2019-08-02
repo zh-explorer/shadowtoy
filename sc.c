@@ -257,6 +257,7 @@ void enc_packet(unsigned char *data, unsigned int size, unsigned char **output, 
 
 
     random_byte(&random_len, 1);
+    random_len = random_len % 80;
     length = 80 + size + pad + random_len;
     out_buf = malloc(length);
     memset(out_buf, 0, length);

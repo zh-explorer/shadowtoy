@@ -32,10 +32,10 @@ int tcp_listen(in_addr_t ip, in_port_t port) {
     serv_addr.sin_port = port;
 
     // let system give us port
-//    if (bind(server_fd, (const struct sockaddr *) &serv_addr, sizeof(serv_addr)) == -1) {
-//        logger(ERR, stderr, "bind: %s", strerror(errno));
-//        exit(1);
-//    }
+    if (bind(server_fd, (const struct sockaddr *) &serv_addr, sizeof(serv_addr)) == -1) {
+        logger(ERR, stderr, "bind: %s", strerror(errno));
+        exit(1);
+    }
 
     if (listen(server_fd, 30) == -1) {
         logger(ERR, stderr, "listen: %s", strerror(errno));

@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
         puts("can not find port, maybe server is error");
     }
     printf("now you server if at %d port\n", ntohs(addr.sin_port));
-
+    fflush(stdout);
     while (1) {
         accpet_fd = accept(server_fd, NULL, NULL);
         if (accpet_fd < 0) {

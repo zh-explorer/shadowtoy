@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
             logger(ERR, stderr, "get a err fd", strerror(errno));
             continue;
         }
-        // sleep(1) ;  //Prevent brute force
+        sleep(1) ;  //Prevent brute force
         pid = fork();
         if (pid == -1) {
             logger(ERR, stderr, "fork error", strerror(errno));

@@ -16,7 +16,9 @@
 #include <stdlib.h>
 #include <wait.h>
 #include "poll.h"
-
+#include <signal.h>
+#include "unit.h"
+#include <sys/select.h>
 
 #define LISTEN_IP "0.0.0.0"
 #define LISTEN_PORT 8888
@@ -31,6 +33,11 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in addr;
     unsigned int addr_len;
     int result;
+    fd_set fdSet;
+    char *buffer[1024];
+
+//    signal(SIGHUP, handle);
+//    signal(SIGPIPE, handle);
 
     if (argc == 2) {
         port = atoi(argv[1]);
@@ -51,35 +58,56 @@ int main(int argc, char *argv[]) {
     }
     printf("now you server if at %d port\n", ntohs(addr.sin_port));
     fflush(stdout);
+
+    FD_ZERO(&fdSet);
+    FD_SET(STDIN_FILENO, &fdSet);
+    FD_SET(server_fd, &fdSet);
+    set_noblock(server_fd);
+    set_noblock(STDIN_FILENO);
+
     while (1) {
-        accpet_fd = accept(server_fd, NULL, NULL);
-        if (accpet_fd < 0) {
-            // skip this connection
-            logger(ERR, stderr, "get a err fd", strerror(errno));
-            continue;
-        }
-        sleep(1);  //Prevent brute force
-        pid = fork();
-        if (pid == -1) {
-            logger(ERR, stderr, "fork error", strerror(errno));
-            // fork error
-            exit(1);
-        }
-        if (pid != 0) {
-            // parent
-            close(accpet_fd);
-            wait(NULL);
-        } else {
+        FD_ZERO(&fdSet);
+        FD_SET(STDIN_FILENO, &fdSet);
+        FD_SET(server_fd, &fdSet);
+
+        result = select(4, &fdSet, NULL, NULL, 0);
+
+        if (FD_ISSET(server_fd, &fdSet)) {
+            accpet_fd = accept(server_fd, NULL, NULL);
+            if (accpet_fd < 0) {
+                // skip this connection
+                logger(ERR, stderr, "get a err fd", strerror(errno));
+                continue;
+            }
+            sleep(1);  //Prevent brute force
             pid = fork();
             if (pid == -1) {
                 logger(ERR, stderr, "fork error", strerror(errno));
                 // fork error
                 exit(1);
-            } else if (pid != 0) {
+            }
+            if (pid != 0) {
                 // parent
+                close(accpet_fd);
+                wait(NULL);
+            } else {
+                pid = fork();
+                if (pid == -1) {
+                    logger(ERR, stderr, "fork error", strerror(errno));
+                    // fork error
+                    exit(1);
+                } else if (pid != 0) {
+                    // parent
+                    exit(0);
+                }
+                break;
+            }
+        }
+        if (FD_ISSET(STDIN_FILENO, &fdSet)) {
+            result = read(STDIN_FILENO, buffer, 1024);
+            if (result <= 0) {
                 exit(0);
             }
-            break;
         }
     }
     //only child can get here

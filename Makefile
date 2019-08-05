@@ -1,17 +1,12 @@
 CC=gcc
-CFLAGS=-g -fno-stack-protector -D LOG_DEBUG
+CFLAGS=-g -fno-stack-protector
 LD=-Wl,-Bstatic -lcrypto  -Wl,-Bdynamic
 OBJ=log.o netio.o poll.o sc.o socks5.o unit.o num_calc.o modpow.o
 VPATH = rsa/big_num:rsa/Montgomery
 
 .PHONY: clean
 
-all: client server
-
-server: CFLAGS += -D IS_SERVER
-server : ${OBJ}
-	${CC} -c server.c -o server.o ${CFLAGS}
-	${CC}  ${OBJ} server.o -o $@ ${LD}
+all: client
 
 client: CFLAGS += -D IS_CLIENT
 client: ${OBJ}

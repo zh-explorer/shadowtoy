@@ -24,7 +24,7 @@ void read_size(int fd, unsigned char *buffer, unsigned int size) {
             exit(1);
         }
         if (result == -1) {
-            logger(ERR, stderr, "recv data error");
+            logger(ERR, stderr, "recv data error %s", strerror(errno));
             exit(1);
         }
         read_count += result;
@@ -193,4 +193,5 @@ char *version = "    :mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 
 void get_version() {
     puts(version);
+    puts("反正不是我逆向，来打我啊");
 }

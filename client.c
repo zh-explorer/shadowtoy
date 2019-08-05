@@ -20,7 +20,7 @@
 
 
 #define LISTEN_IP "0.0.0.0"
-#define LISTEN_PORT 3343
+#define LISTEN_PORT 3344
 
 
 int main(int argc, char *argv[]) {

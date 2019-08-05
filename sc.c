@@ -19,13 +19,30 @@
 #include "unit.h"
 #include <time.h>
 #include <openssl/sha.h>
+#include <assert.h>
+#include "rsa/Montgomery/modpow.h"
+#include "rsa/big_num/num_calc.h"
 
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 8888
+#define SERVER_IP "47.112.140.16"
+#define SERVER_PORT 13343
 
 #define BLCOK_SIZE 1024
 
 char *password = "meiyoumima";
+
+//#define IS_SERVER
+
+#ifdef IS_CLIENT
+unsigned char e[] = "\x2d\x01\x01";
+unsigned char d[] = "\x9d\xd4\x11\xc7\xcf\x7a\xba\xf5\xc4\xa9\xcb\x2b\x2d\x8d\x12\x36\xbe\xdc\x4c\xb9\x5d\xf7\xb0\xb5\x8e\x4a\xba\x17\xbd\xe8\xbe\x48";
+unsigned char n[] = "\xb1\x9a\x9b\x57\x67\x35\xf0\x69\x76\xb7\x14\xd0\x46\x53\xd4\x87\x18\x43\x53\x52\x08\xb8\xfd\x43\x49\xbe\xab\xba\xb9\x19\x64\x79";
+#endif
+
+#ifdef IS_SERVER
+unsigned char e[] = "\x2d\x01\x01";
+unsigned char d[] = "\xe5\x21\x43\x63\x1e\x2a\x7c\xb4\xe8\x21\x6c\x2f\x2a\x98\x32\xc1\x7c\x7d\x43\x6c\x8f\x80\xb5\x33\xfc\xc7\x31\x30\x9f\xf6\x89\x0a";
+unsigned char n[] = "\x9d\xd1\x5e\x70\xbc\xb6\x40\xc1\xe0\xad\x83\x9d\xae\xf0\x28\x08\x46\x56\xce\x38\x2c\xae\xf9\xb5\x29\xf2\x09\x61\xfe\xb9\xd8\x7e";
+#endif
 
 
 typedef struct {
@@ -47,6 +64,8 @@ char *errmsg(int err);
 
 void sc_init(sc_ctx *ctx, int fd);
 
+void clean_ctx(sc_ctx *ctx);
+
 void read_size_sc(sc_ctx *ctx, unsigned char *buffer, unsigned int size);
 
 void write_and_clean(sc_ctx *ctx, int peer_fd);
@@ -67,6 +86,180 @@ void sc_resp_err(int fd, unsigned char err_code, in_addr_t ip, in_port_t port) {
     exit(0);
 }
 
+void server_key_exchange(int fd) {
+    sc_ctx ctx;
+    uint16_t length;
+    unsigned char *enc_data;
+    unsigned int enc_data_size;
+    unsigned char *key;
+
+    sc_init(&ctx, fd);
+    // get e/n form client
+    read_size_sc(&ctx, (unsigned char *) &length, 2);
+    unsigned char *client_e = malloc(length);
+    read_size_sc(&ctx, client_e, length);
+    big_integer *integer_client_e = from_bytes(client_e, length);
+    free(client_e);
+
+    read_size_sc(&ctx, (unsigned char *) &length, 2);
+    unsigned char *client_n = malloc(length);
+    read_size_sc(&ctx, client_n, length);
+    big_integer *integer_client_n = from_bytes(client_n, length);
+    free(client_n);
+
+    // send enc key
+    unsigned char server_sub_key[16];
+    random_byte(server_sub_key, 16);
+    big_integer *server_key = from_bytes(server_sub_key, 16);
+    big_integer *enc_server_key;
+    enc_server_key = mod_pow(server_key, integer_client_e, integer_client_n);
+    unsigned char *enc_server_key_buf;
+    unsigned int enc_server_key_size;
+    to_bytes(enc_server_key, &enc_server_key_buf, &enc_server_key_size);
+
+    unsigned char *enc_server_key_pack = malloc(enc_server_key_size + 2);
+    *(uint16_t *) enc_server_key_pack = enc_server_key_size;
+    memcpy(enc_server_key_pack + 2, enc_server_key_buf, enc_server_key_size);
+
+    enc_packet(enc_server_key_pack, enc_server_key_size + 2, &enc_data, &enc_data_size);
+    write(fd, enc_data, enc_data_size);
+    free(enc_server_key_buf);
+    delete_integer(enc_server_key);
+    delete_integer(server_key);
+    delete_integer(integer_client_e);
+    delete_integer(integer_client_n);
+
+    //send our e,n
+    key = malloc(sizeof(e)-1 + sizeof(n)-1 + 4);
+    *(uint16_t *) key = sizeof(e) -1;
+    memcpy(key + 2, e, sizeof(e) - 1);
+    *(uint16_t *) (key + 2 + sizeof(e)-1) = sizeof(n)-1;
+    memcpy(key + 4 + sizeof(e)-1, n, sizeof(n)-1);
+    enc_packet(key, sizeof(e)-1 + sizeof(n)-1 + 4, &enc_data, &enc_data_size);
+    write(fd, enc_data, enc_data_size);
+    free(enc_data);
+    free(key);
+
+    // get enc client key
+    read_size_sc(&ctx, (unsigned char *) &length, 2);
+    key = malloc(length);
+    read_size_sc(&ctx, key, length);
+
+    // dec key
+    big_integer *num_enc_key = from_bytes(key, length);
+    big_integer *integer_d = from_bytes(d, sizeof(d)-1);
+    big_integer *integer_n = from_bytes(n, sizeof(n)-1);
+    big_integer *num_key = mod_pow(num_enc_key, integer_d, integer_n);
+    unsigned char *client_sub_key;
+    unsigned int sub_key_len;
+    to_bytes(num_key, &client_sub_key, &sub_key_len);   // we should now the key len is 16;
+    delete_integer(num_enc_key);
+    delete_integer(integer_d);
+    delete_integer(integer_n);
+    delete_integer(num_key);
+    free(key);
+
+    SHA256_CTX sha256_ctx;
+    SHA256_Init(&sha256_ctx);
+
+    SHA256_Update(&sha256_ctx, client_sub_key, 16);
+    SHA256_Update(&sha256_ctx, server_sub_key, 16);
+    SHA256_Update(&sha256_ctx, password, strlen(password));
+    unsigned char md[SHA256_DIGEST_LENGTH];
+    SHA256_Final(md, &sha256_ctx);
+    password = malloc(SHA256_DIGEST_LENGTH * 2 + 1);
+    b2hex(md, SHA256_DIGEST_LENGTH, password);
+//    free(server_sub_key);
+    clean_ctx(&ctx);
+}
+
+void client_key_exchange(int client_fd) {
+    unsigned char *server_sub_key;
+    unsigned int sub_key_len, enc_data_size;
+    unsigned char *key, *enc_data;
+    sc_ctx ctx;
+    SHA256_CTX sha256_ctx;
+    uint16_t length;
+
+    sc_init(&ctx, client_fd);
+    // first send our e/n
+    key = malloc(sizeof(e) + sizeof(n) + 4 - 2);
+    *(uint16_t *) key = sizeof(e) - 1;
+    memcpy(key + 2, e, sizeof(e) - 1);
+    *(uint16_t *) (key + 2 + sizeof(e) -1 ) = sizeof(n) - 1;
+    memcpy(key + 4 + sizeof(e) - 1, n, sizeof(n) - 1);
+    enc_packet(key, sizeof(e)-1 + sizeof(n)-1 + 4, &enc_data, &enc_data_size);
+    write(client_fd, enc_data, enc_data_size);
+    free(enc_data);
+    free(key);
+
+    // get enc server key
+    sc_init(&ctx, client_fd);
+    read_size_sc(&ctx, (unsigned char *) &length, 2);
+    key = malloc(length);
+    read_size_sc(&ctx, key, length);
+
+    // dec key
+    big_integer *num_enc_key = from_bytes(key, length);
+    big_integer *integer_d = from_bytes(d, sizeof(d)-1);
+    big_integer *integer_n = from_bytes(n, sizeof(n)-1);
+    big_integer *num_key = mod_pow(num_enc_key, integer_d, integer_n);
+
+    to_bytes(num_key, &server_sub_key, &sub_key_len);   // we should now the key len is 16;
+    delete_integer(num_enc_key);
+    delete_integer(integer_d);
+    delete_integer(integer_n);
+    delete_integer(num_key);
+    free(key);
+
+    // get e/n form server
+    read_size_sc(&ctx, (unsigned char *) &length, 2);
+    unsigned char *server_e = malloc(length);
+    read_size_sc(&ctx, server_e, length);
+    big_integer *integer_server_e = from_bytes(server_e, length);
+    free(server_e);
+
+    read_size_sc(&ctx, (unsigned char *) &length, 2);
+    unsigned char *server_n = malloc(length);
+    read_size_sc(&ctx, server_n, length);
+    big_integer *integer_server_n = from_bytes(server_n, length);
+    free(server_n);
+
+    // send enc key
+    unsigned char client_sub_key[16];
+    random_byte(client_sub_key, 16);
+    big_integer *client_key = from_bytes(client_sub_key, 16);
+    big_integer *enc_client_key;
+    enc_client_key = mod_pow(client_key, integer_server_e, integer_server_n);
+    unsigned char *enc_client_key_buf;
+    unsigned int enc_client_key_size;
+    to_bytes(enc_client_key, &enc_client_key_buf, &enc_client_key_size);
+    unsigned char *enc_client_key_pack = malloc(enc_client_key_size + 2);
+    *(uint16_t *) enc_client_key_pack = enc_client_key_size;
+    memcpy(enc_client_key_pack + 2, enc_client_key_buf, enc_client_key_size);
+
+    enc_packet(enc_client_key_pack, enc_client_key_size + 2, &enc_data, &enc_data_size);
+    write(client_fd, enc_data, enc_data_size);
+    free(enc_client_key_buf);
+    free(enc_client_key_pack);
+    delete_integer(enc_client_key);
+    delete_integer(client_key);
+    delete_integer(integer_server_e);
+    delete_integer(integer_server_n);
+
+    SHA256_Init(&sha256_ctx);
+
+    SHA256_Update(&sha256_ctx, client_sub_key, 16);
+    SHA256_Update(&sha256_ctx, server_sub_key, 16);
+    SHA256_Update(&sha256_ctx, password, strlen(password));
+    unsigned char md[SHA256_DIGEST_LENGTH];
+    SHA256_Final(md, &sha256_ctx);
+    password = malloc(SHA256_DIGEST_LENGTH * 2 + 1);
+    b2hex(md, SHA256_DIGEST_LENGTH, password);
+    free(server_sub_key);
+    clean_ctx(&ctx);
+}
+
 int sc_client(int addr_type, unsigned char *ip, unsigned char ip_size, in_port_t port) {
     int client_fd;
     unsigned char *req, *enc_data;
@@ -79,6 +272,9 @@ int sc_client(int addr_type, unsigned char *ip, unsigned char ip_size, in_port_t
         logger(ERR, stderr, "sc_client conn to %s:%d err", SERVER_IP, SERVER_PORT);
         return client_fd;
     }
+
+    client_key_exchange(client_fd);
+
     if (addr_type == 1) {
         req_len = 9;
         req = malloc(req_len);
@@ -109,7 +305,6 @@ int sc_client(int addr_type, unsigned char *ip, unsigned char ip_size, in_port_t
     free(enc_data);
 
     // the remote only resp 4 byte ipv4 addr type now
-
     sc_init(&ctx, client_fd);
     read_size_sc(&ctx, resp, 9);
 
@@ -124,7 +319,7 @@ int sc_client(int addr_type, unsigned char *ip, unsigned char ip_size, in_port_t
     }
     free(req);
     // wo ignore remote ip/port
-
+    clean_ctx(&ctx);
     return client_fd;
 }
 
@@ -142,7 +337,7 @@ int sc_server(int fd) {
     sc_ctx ctx;
 
     alarm(30); // server proto must finish in 30 sec
-
+    server_key_exchange(fd);
     sc_init(&ctx, fd);
 
     read_size_sc(&ctx, in_buffer, 3);
@@ -219,6 +414,7 @@ int sc_server(int fd) {
     write(fd, enc_data, enc_data_size);
     free(enc_data);
 //    write_and_clean(&ctx, client_fd);
+    clean_ctx(&ctx);
 
     // server connection success, canceled alarm;
     alarm(0);
@@ -254,7 +450,6 @@ void enc_packet(unsigned char *data, unsigned int size, unsigned char **output, 
     int i;
     unsigned char key[16];
     unsigned char iv[16];
-
 
     random_byte(&random_len, 1);
     random_len = random_len % 80;
@@ -357,6 +552,11 @@ void sc_init(sc_ctx *ctx, int fd) {
     ctx->buffer = malloc(BLCOK_SIZE);
 }
 
+void clean_ctx(sc_ctx *ctx) {
+    assert(ctx->data_size == 0);
+    free(ctx->buffer);
+}
+
 void write_and_clean(sc_ctx *ctx, int peer_fd) {
     write(peer_fd, ctx->buffer, ctx->data_size);
     free(ctx->buffer);
@@ -371,7 +571,7 @@ void read_sc_pack(sc_ctx *ctx) {
     unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned char key[16];
     unsigned char iv[16];
-    unsigned int data_size;                 
+    unsigned int data_size;
     unsigned char *enc_data;
     unsigned char pad;
     SHA256_CTX *sha256_ctx = malloc(sizeof(SHA256_CTX));
@@ -418,7 +618,7 @@ void read_sc_pack(sc_ctx *ctx) {
         exit(1);
     }
     data_size = dec_pack->length - dec_pack->random_len - 80;
-    enc_data = malloc(data_size); 
+    enc_data = malloc(data_size);
     read_size(fd, enc_data, data_size);
     if (data_size + ctx->data_size > ctx->buffer_size) {
         ctx->buffer = realloc(ctx->buffer, data_size + ctx->data_size + BLCOK_SIZE);
@@ -443,7 +643,8 @@ void read_sc_pack(sc_ctx *ctx) {
 //    memset(ctx->buffer + ctx->data_size + data_size - pad, 0, pad);
     ctx->data_size += data_size - pad;
     free(enc_data);
-    rand_data = alloca((int)(char)dec_pack->random_len); //dec_pack->random_len -> (int)(char)dec_pack->random_len for stackoverflow
+    rand_data = alloca(
+            (int) (char) dec_pack->random_len); //dec_pack->random_len -> (int)(char)dec_pack->random_len for stackoverflow
     read_size(fd, rand_data, dec_pack->random_len);
     SHA256_Update(sha256_ctx, rand_data, dec_pack->random_len);
 

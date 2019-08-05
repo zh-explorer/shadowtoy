@@ -386,5 +386,50 @@ struct big_integer *from_array(const uint32_t *num, int size) {
     p->prev->next = NULL;
     new->tail = p->prev;
     new->cache = p;
+    new->size = size;
     return new;
+}
+
+struct big_integer *from_bytes(const unsigned char *bytes, unsigned int size) {
+    struct big_integer *new = malloc(sizeof(struct big_integer));
+    struct integer_node *p, *new_node;
+    int i;
+    uint32_t *num = (uint32_t * )bytes;
+
+    new_node = malloc(sizeof(struct integer_node));
+    new_node->prev = NULL;
+    new->head = new_node;
+    p = new_node;
+    for (i = 0; i < (size / 4); i++) {
+        p->num = num[i];
+        new_node = malloc(sizeof(struct integer_node));
+        p->next = new_node;
+        new_node->prev = p;
+        p = new_node;
+    }
+    if (size % 4 != 0) {
+        p->next = NULL;
+        new->cache = NULL;
+        new->tail = p;
+        p->num = 0;
+        memcpy(&p->num, bytes + 4 * i, size % 4);
+        new->size = size / 4 + 1;
+    } else {
+        p->prev->next = NULL;
+        new->tail = p->prev;
+        new->cache = p;
+        new->size = size / 4;
+    }
+    return new;
+}
+
+void to_bytes(big_integer *integer, unsigned char **buf, unsigned int *size) {
+    int i;
+    integer_node *node;
+    uint32_t *p = malloc(integer->size * 4);
+    *size = integer->size * 4;
+    for (i = 0, node = integer->head; i < integer->size; i++, node = node->next) {
+        p[i] = node->num;
+    }
+    *buf = (unsigned char *)p;
 }

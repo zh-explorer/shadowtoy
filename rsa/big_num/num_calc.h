@@ -4,7 +4,7 @@
 
 #ifndef SHADOWTOY_NUM_CALC_H
 #define SHADOWTOY_NUM_CALC_H
-#define NUM_DEBUG
+//#define NUM_DEBUG
 
 #include <stdint.h>
 
@@ -68,5 +68,9 @@ void print_array(struct big_integer *integer);
 #endif
 
 struct big_integer *from_array(const uint32_t *num, int size);
+
+struct big_integer *from_bytes(const unsigned char *bytes, unsigned int size);
+
+void to_bytes(big_integer *integer, unsigned char **buf, unsigned int *size);
 
 #endif //SHADOWTOY_NUM_CALC_H

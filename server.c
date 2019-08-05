@@ -21,7 +21,7 @@
 #include <sys/select.h>
 
 #define LISTEN_IP "0.0.0.0"
-#define LISTEN_PORT 8888
+#define LISTEN_PORT 13343
 
 int main(int argc, char *argv[]) {
     int server_fd;

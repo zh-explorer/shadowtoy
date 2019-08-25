@@ -6,12 +6,18 @@ VPATH = rsa/big_num:rsa/Montgomery
 
 .PHONY: clean
 
-all: client
+all: client server
 
 client: CFLAGS += -D IS_CLIENT
 client: ${OBJ}
 	${CC} -c client.c -o client.o ${CFLAGS}
 	${CC}  ${OBJ} client.o -o $@ ${LD}
+
+server: CFLAGS += -D IS_SERVER
+server: ${OBJ}
+	${CC} -c server.c -o server.o ${CFLAGS}
+	${CC}  ${OBJ} server.o -o $@ ${LD}
+
 
 clean:
 	-rm *~

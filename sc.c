@@ -152,7 +152,7 @@ void server_key_exchange(int fd) {
     big_integer *num_key = mod_pow(num_enc_key, integer_d, integer_n);
     unsigned char *client_sub_key;
     unsigned int sub_key_len;
-    to_bytes(num_key, &client_sub_key, &sub_key_len);   // we should now the key len is 16;
+    to_bytes(num_key, &client_sub_key, &sub_key_len);   // we should known the key len is 16;
     delete_integer(num_enc_key);
     delete_integer(integer_d);
     delete_integer(integer_n);
